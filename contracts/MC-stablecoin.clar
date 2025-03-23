@@ -508,3 +508,136 @@ int)
     )
   )
 )
+;; Governance functions
+
+;; Update a collateral type parameter
+(define-public (update-collateral-parameter 
+  (collateral-type (string-ascii 10)) 
+  (parameter (string-ascii 20)) 
+  (new-value uint))
+  
+  (begin
+    ;; Only contract owner can change parameters for now
+    ;; In a full implementation, this would check governance votes
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    (let ((collateral-info (unwrap! (map-get? collateral-types { collateral-type: collateral-type }) err-collateral-type-not-found)))
+      (match parameter
+        "liquidation-ratio" 
+          (begin 
+            (asserts! (>= new-value u1000000) err-invalid-parameter)
+            (map-set collateral-types
+              { collateral-type: collateral-type }
+              (merge collateral-info { liquidation-ratio: new-value })
+            )
+          )
+        "liquidation-penalty" 
+          (begin 
+            (asserts! (<= new-value u500000) err-invalid-parameter)
+            (map-set collateral-types
+              { collateral-type: collateral-type }
+              (merge collateral-info { liquidation-penalty: new-value })
+            )
+          )
+        "stability-fee" 
+          (begin 
+            (asserts! (<= new-value u100000) err-invalid-parameter)
+            (map-set collateral-types
+              { collateral-type: collateral-type }
+              (merge collateral-info { stability-fee: new-value })
+            )
+          )
+        "debt-ceiling" 
+          (map-set collateral-types
+            { collateral-type: collateral-type }
+            (merge collateral-info { debt-ceiling: new-value })
+          )
+        "min-vault-debt" 
+          (map-set collateral-types
+            { collateral-type: collateral-type }
+            (merge collateral-info { min-vault-debt: new-value })
+          )
+        (err err-invalid-parameter)
+      )
+      
+      (ok true)
+    )
+  )
+)
+
+;; Update global debt ceiling
+(define-public (set-global-debt-ceiling (new-ceiling uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (var-set global-debt-ceiling new-ceiling)
+    (ok true)
+  )
+)
+
+;; Toggle global liquidation circuit breaker
+(define-public (set-liquidation-enabled (enabled bool))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (var-set liquidation-enabled enabled)
+    (ok true)
+  )
+)
+
+;; Toggle a specific collateral type
+(define-public (set-collateral-enabled (collateral-type (string-ascii 10)) (enabled bool))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    (let ((collateral-info (unwrap! (map-get? collateral-types { collateral-type: collateral-type }) err-collateral-type-not-found)))
+      (map-set collateral-types
+        { collateral-type: collateral-type }
+        (merge collateral-info { enabled: enabled })
+      )
+      
+      (ok true)
+    )
+  )
+)
+
+;; Read-only functions
+
+;; Get vault information
+(define-read-only (get-vault-info (owner principal) (vault-id uint) (collateral-type (string-ascii 10)))
+  (map-get? vaults { owner: owner, vault-id: vault-id, collateral-type: collateral-type })
+)
+
+;; Get collateral type information
+(define-read-only (get-collateral-type-info (collateral-type (string-ascii 10)))
+  (map-get? collateral-types { collateral-type: collateral-type })
+)
+
+;; Get price feed information
+(define-read-only (get-price-feed (asset (string-ascii 10)))
+  (map-get? price-feeds { asset: asset })
+)
+
+;; Get all vaults owned by a user
+(define-read-only (get-user-vault-ids (owner principal))
+  (get vault-ids (default-to { vault-ids: (list) } (map-get? user-vaults { owner: owner })))
+)
+
+;; Get current collateralization ratio for a vault
+(define-read-only (get-vault-collateralization (owner principal) (vault-id uint) (collateral-type (string-ascii 10)))
+  (let (
+    (vault (unwrap! (map-get? vaults { owner: owner, vault-id: vault-id, collateral-type: collateral-type }) none))
+    (price-feed (unwrap! (map-get? price-feeds { asset: collateral-type }) none))
+  )
+    (match (and vault price-feed)
+      true (let (
+        (collateral-amount (get collateral-amount vault))
+        (debt-amount (get debt-amount vault))
+        (collateral-price (get price price-feed))
+      )
+        (if (is-eq debt-amount u0)
+          (some u0)  ;; No debt means infinite collateral ratio, return 0 as special value
+          (some (/ (* collateral-amount collateral-price) debt-amount))
+        ))
+      false none
+    )
+  )
+)
