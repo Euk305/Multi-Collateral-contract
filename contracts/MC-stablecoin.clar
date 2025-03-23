@@ -19,3 +19,51 @@
 
 ;; Token definitions
 (define-fungible-token stablecoin)
+
+;; Oracle price data - updated by trusted oracles
+(define-map price-feeds
+  { asset: (string-ascii 10) }
+  { 
+    price: uint,            ;; Price in USD * 10^8 (e.g., $1.00 = 100000000)
+    decimals: uint,         ;; Decimal precision of the price feed
+    last-updated: uint      ;; Block height of last update
+  }
+)
+
+;; Authorized oracle principals
+(define-map authorized-oracles
+  { oracle: principal }
+  { authorized: bool }
+)
+
+;; Collateral types and their parameters
+(define-map collateral-types
+  { collateral-type: (string-ascii 10) }
+  {
+    token-contract: principal,    ;; Contract that handles this token
+    liquidation-ratio: uint,      ;; Minimum collateralization ratio (e.g., 150% = 1500000)
+    liquidation-penalty: uint,    ;; Penalty applied during liquidation (e.g., 13% = 130000)
+    stability-fee: uint,          ;; Annual interest rate (e.g., 2% = 20000)
+    debt-ceiling: uint,           ;; Maximum stablecoin that can be minted with this collateral
+    enabled: bool,                ;; Whether this collateral type is active
+    min-vault-debt: uint,         ;; Minimum amount of debt per vault
+    adapter-name: (string-ascii 20) ;; Function name to call for transfers
+  }
+)
+
+;; List of all supported collateral types
+(define-data-var collateral-types-list (list 10 (string-ascii 10)) (list))
+
+;; Vaults - where users lock collateral and mint stablecoin
+(define-map vaults
+  { 
+    owner: principal, 
+    vault-id: uint,
+    collateral-type: (string-ascii 10)
+  }
+  {
+    collateral-amount: uint,   ;; Amount of collateral locked
+    debt-amount: uint,         ;; Amount of stablecoin debt
+    last-interest-update: uint ;; Block height of last interest accrual
+  }
+)
