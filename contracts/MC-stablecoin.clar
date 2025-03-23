@@ -67,3 +67,51 @@
     last-interest-update: uint ;; Block height of last interest accrual
   }
 )
+
+;; Track vault IDs per user
+(define-map user-vaults
+  { owner: principal }
+  { vault-ids: (list 100 uint) }
+)
+
+;; Global system parameters
+(define-data-var global-debt-ceiling uint u1000000000000)  ;; Maximum total stablecoin (1 billion with 8 decimals)
+(define-data-var total-debt uint u0)                       ;; Current total debt in the system
+(define-data-var next-vault-id uint u1)                    ;; Auto-incrementing vault ID
+(define-data-var liquidation-enabled bool true)            ;; Global liquidation circuit breaker
+(define-data-var governance-token principal 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM) ;; Principal of governance token
+
+;; Governance parameters
+(define-map governance-parameters
+  { param-name: (string-ascii 20) }
+  { 
+    value: uint,
+    last-updated: uint 
+  }
+)
+
+;; Initialize contract
+(define-public (initialize (initial-oracles (list 5 principal)))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    ;; Setup initial authorized oracles
+    (map add-oracle initial-oracles)
+    
+    ;; Set initial governance parameters
+    (map-set governance-parameters 
+      { param-name: "surplus-buffer" } 
+      { value: u500000000, last-updated: block-height }) ;; 5 BTC surplus buffer
+    
+    (map-set governance-parameters 
+      { param-name: "debt-auction-size" } 
+      { value: u50000000, last-updated: block-height })  ;; 0.5 BTC per debt auction
+    
+    (ok true)
+  )
+)
+
+;; Helper to add an oracle
+(define-private (add-oracle (oracle principal))
+  (map-set authorized-oracles { oracle: oracle } { authorized: true })
+)
