@@ -37,3 +37,47 @@
   "transfer-btc"       ;; adapter-name
 )
 (print (contract-call? .stablecoin-contract get-collateral-type-info "BTC"))
+
+;; Test adding ETH as collateral
+(print "Test 1.2: Adding ETH as collateral type")
+(contract-call? .stablecoin-contract add-collateral-type 
+  "ETH"                ;; collateral-type
+  eth-token            ;; token-contract
+  u1650000             ;; liquidation-ratio (165%)
+  u150000              ;; liquidation-penalty (15%)
+  u30000               ;; stability-fee (3%)
+  u2000000000          ;; debt-ceiling (20 ETH)
+  u100000              ;; min-vault-debt (0.001 ETH)
+  "transfer-eth"       ;; adapter-name
+)
+(print (contract-call? .stablecoin-contract get-collateral-type-info "ETH"))
+
+;; ========================================
+;; Test 2: Update oracle prices
+;; ========================================
+
+;; Update BTC price (at $40,000 per BTC)
+(print "Test 2.1: Updating BTC price")
+(as-contract tx-sender oracle-1
+  (contract-call? .stablecoin-contract update-price "BTC" u4000000000000)
+)
+(print (contract-call? .stablecoin-contract get-price-feed "BTC"))
+
+;; Update ETH price (at $2,000 per ETH)
+(print "Test 2.2: Updating ETH price")
+(as-contract tx-sender oracle-1
+  (contract-call? .stablecoin-contract update-price "ETH" u200000000000)
+)
+(print (contract-call? .stablecoin-contract get-price-feed "ETH"))
+
+;; ========================================
+;; Test 3: Open vaults and deposit collateral
+;; ========================================
+
+;; Wallet 1 opens a BTC vault
+(print "Test 3.1: Wallet 1 opens a BTC vault")
+(as-contract tx-sender wallet-1
+  (contract-call? .stablecoin-contract open-vault "BTC" u10000000 u50000000)
+)
+(print (contract-call? .stablecoin-contract get-vault-info wallet-1 u1 "BTC"))
+(print (contract-call? .stablecoin-contract get-user-vault-ids wallet-1))
