@@ -81,3 +81,40 @@
 )
 (print (contract-call? .stablecoin-contract get-vault-info wallet-1 u1 "BTC"))
 (print (contract-call? .stablecoin-contract get-user-vault-ids wallet-1))
+;; Wallet 2 opens an ETH vault
+(print "Test 3.2: Wallet 2 opens an ETH vault")
+(as-contract tx-sender wallet-2
+  (contract-call? .stablecoin-contract open-vault "ETH" u50000000 u60000000)
+)
+(print (contract-call? .stablecoin-contract get-vault-info wallet-2 u2 "ETH"))
+(print (contract-call? .stablecoin-contract get-user-vault-ids wallet-2))
+
+;; ========================================
+;; Test 4: Deposit additional collateral
+;; ========================================
+
+;; Wallet 1 deposits more BTC
+(print "Test 4.1: Wallet 1 deposits more BTC")
+(as-contract tx-sender wallet-1
+  (contract-call? .stablecoin-contract deposit-collateral u1 "BTC" u5000000)
+)
+(print (contract-call? .stablecoin-contract get-vault-info wallet-1 u1 "BTC"))
+
+;; Check collateralization ratio
+(print "Test 4.2: Check BTC vault collateralization ratio")
+(print (contract-call? .stablecoin-contract get-vault-collateralization wallet-1 u1 "BTC"))
+
+;; ========================================
+;; Test 5: Generate additional stablecoin
+;; ========================================
+
+;; Wallet 1 generates more stablecoin
+(print "Test 5.1: Wallet 1 generates more stablecoin")
+(as-contract tx-sender wallet-1
+  (contract-call? .stablecoin-contract generate-stablecoin u1 "BTC" u20000000)
+)
+(print (contract-call? .stablecoin-contract get-vault-info wallet-1 u1 "BTC"))
+
+;; Check collateralization ratio after borrowing more
+(print "Test 5.2: Check BTC vault collateralization ratio after borrowing")
+(print (contract-call? .stablecoin-contract get-vault-collateralization wallet-1 u1 "BTC"))
